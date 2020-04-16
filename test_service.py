@@ -1,6 +1,5 @@
 import unittest
-
-from x import *
+from url_lookup_service import *
 
 
 class Test_Service_init_in_memory_db(unittest.TestCase):
@@ -10,7 +9,7 @@ class Test_Service_init_in_memory_db(unittest.TestCase):
         self.service.setup()
 
     def test_init(self):
-        assert len(self.service.db_obj.malware_db) == 0
+        assert len(self.service.db_obj.db) == 0
 
 class Test_url_update(unittest.TestCase):
     def setUp(self):
@@ -25,11 +24,11 @@ class Test_url_update(unittest.TestCase):
 
     def test_update_present(self):
         for url in self.updated_urls:
-            assert (url in self.service.db_obj.malware_db), "missing url %s" % url
+            assert (url in self.service.db_obj.db), "missing url %s" % url
 
     def test_update_absent(self):
         for url in self.missing_urls:
-            assert(url not in self.service.db_obj.malware_db), "extra url %s" % url
+            assert(url not in self.service.db_obj.db), "extra url %s" % url
 
 
 class Test_url_lookup(unittest.TestCase):
@@ -41,7 +40,7 @@ class Test_url_lookup(unittest.TestCase):
         self.missing_urls = ['test_url3','test_url4']
 
         for url in self.updated_urls:
-            self.service.db_obj.malware_db.add(url)
+            self.service.db_obj.db.add(url)
 
     def test_lookup_present(self):
         for url in self.updated_urls:
@@ -50,6 +49,68 @@ class Test_url_lookup(unittest.TestCase):
     def test_lookup_absent(self):
         for url in self.missing_urls:
             assert (not self.service.lookup_url(url)), "extra url %s" % url
+
+class Test_url_update_scale(unittest.TestCase):
+    def setUp(self):
+        self.service = url_lookup_service()
+        self.service.setup()
+
+        self.updated_urls = []
+        for i in range(5000):
+            self.updated_urls.append('malware_' + str(i))
+        self.missing_urls = ['missing_url1','missing_url2']
+
+        for url in self.updated_urls:
+            self.service.update_url(url)
+
+    def test_update_present(self):
+        for url in self.updated_urls:
+            assert (url in self.service.db_obj.db), "missing url %s" % url
+
+    def test_update_absent(self):
+        for url in self.missing_urls:
+            assert(url not in self.service.db_obj.db), "extra url %s" % url
+
+
+class Test_Service_init_redis_db(unittest.TestCase):
+
+    def setUp(self):
+        self.service = url_lookup_service()
+        self.service.db_info['type'] = 'redis'
+        self.service.db_info['host'] = 'localhost'
+        self.service.db_info['port'] = 6379
+        self.service.setup()
+
+    def test_init(self):
+        db_obj = self.service.db_obj
+        assert (db_obj.db.scard(db_obj.redis_set) == 0), "redis database is not empty"
+
+class Test_url_update_scale_redis(unittest.TestCase):
+    def setUp(self):
+        self.service = url_lookup_service()
+        self.service.db_info['type'] = 'redis'
+        self.service.db_info['host'] = 'localhost'
+        self.service.db_info['port'] = 6379
+        self.service.setup()
+
+        self.updated_urls = []
+        for i in range(5000):
+            self.updated_urls.append('malware_' + str(i))
+        self.missing_urls = ['missing_url1','missing_url2']
+
+        for url in self.updated_urls:
+            self.service.update_url(url)
+
+    def test_update_present(self):
+        db_obj = self.service.db_obj
+        for url in self.updated_urls:
+            assert (db_obj.db.sismember(db_obj.redis_set,url)), "missing url %s" % url
+
+    def test_update_absent(self):
+        db_obj = self.service.db_obj
+        for url in self.missing_urls:
+            assert (not db_obj.db.sismember(db_obj.redis_set,url)), "extra url %s" % url
+
 
 if __name__ == '__main__':
     unittest.main()
