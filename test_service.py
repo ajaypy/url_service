@@ -114,11 +114,5 @@ class Test_url_update_scale_redis(unittest.TestCase):
         for url in self.missing_urls:
             assert (not db_obj.db.sismember(db_obj.redis_set,url)), "extra url %s" % url
 
-    @classmethod
-    def tearDownClass(cls):
-        db_obj = cls.service.db_obj
-        while (db_obj.db.scard(db_obj.redis_set) != 0):
-            cls.service.db_obj.db.spop(db_obj.redis_set)
-
 if __name__ == '__main__':
     unittest.main()
